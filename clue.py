@@ -129,7 +129,16 @@ class Clue(Thread):
 			sleep(wait)
 
 	def play_dead(self, message, address):
-		pass
+		try:
+			tid = message[b"t"]
+			message = {
+				"t": tid,
+				"y": "e",
+				"e": [202, "Server Error"]
+			}
+			self.send_krpc(message, address)
+		except KeyError:
+			pass
 
 	def on_get_peers_request(self, message, address):
 		try:
