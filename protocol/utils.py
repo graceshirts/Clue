@@ -13,5 +13,5 @@ def random_id():
 	sh.update(random_bytes(length=20))
 	return sh.digest()
 
-def get_neighbor(target, nid, end=10):
+def get_neighbor(target, nid, end=-2):
 	return target[:end] + nid[end:]
