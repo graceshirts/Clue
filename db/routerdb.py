@@ -27,7 +27,7 @@ class RouterDB(object):
 		self.c.execute('''INSERT OR REPLACE INTO info_hash (hash, hash_type, create_date, node_ip) 
 				VALUES (?, ?, ?, ?)''', 
 				(
-					b2a_hex(info_hash), hash_type, now_time_string(), node_ip
+					b2a_hex(info_hash).upper(), hash_type, now_time_string(), node_ip
 				)
 			)
 		self.commit()

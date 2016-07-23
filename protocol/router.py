@@ -21,7 +21,7 @@ BOOTSTRAP_NODES =  (
 
 TID_LENGTH = 2
 RE_join_DHT_INTERVAL = 3
-CLIENT_VERSION = b'LT\x01\x00'
+CLIENT_VERSION = b'UT\xa5Z'
 TOKEN_LENGTH = 8
 RECENT_IP_STORAGE = 200
 MAX_BANS = 200
@@ -31,7 +31,7 @@ def random_bytes(length):
 
 def random_id():
 	h = sha1()
-	h.update(random_bytes(length=32))
+	h.update(random_bytes(length=256))
 	return h.digest()
 
 def fake_neighbor(target, nid, end=-5):
@@ -208,7 +208,7 @@ class Router(FakeNode):
 			if len(infohash) != 20:
 				self.send_error(msg, address, 201)
 			else:
-				self.db.create_hash_record(info_hash=infohash, hash_type=1, node_ip=address[0])
+				#self.db.create_hash_record(info_hash=infohash, hash_type=1, node_ip=address[0])
 				msg = {
 					't': tid,
 					'y': 'r',
@@ -246,6 +246,7 @@ class Router(FakeNode):
 			msg = {
 				't': tid,
 				'y': r,
+				'v': CLIENT_VERSION,
 				'r': {
 					'id': fake_neighbor(nid, self.nid)
 				}
@@ -264,6 +265,7 @@ class Router(FakeNode):
 			msg = {
 				't': tid,
 				'y': 'e',
+				'v': CLIENT_VERSION,
 				'e': [code, error_msg[code]]
 			}
 			self.send_krpc(msg, address)
