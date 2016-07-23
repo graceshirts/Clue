@@ -22,16 +22,22 @@ class RouterDB(object):
 		self.conn.commit()
 
 	def create_hash_record(self, info_hash):
-		self.c.execute('''INSERT OR IGNORE INTO info_hash (hash, create_date, update_date) 
-				VALUES (?, ?, ?)''', 
-				(
-					b2a_hex(info_hash), now_time_string(), now_time_string()
+		try:
+			self.c.execute('''INSERT OR IGNORE INTO info_hash (hash, create_date, update_date) 
+					VALUES (?, ?, ?)''', 
+					(
+						b2a_hex(info_hash), now_time_string(), now_time_string()
+					)
 				)
-			)
-		self.commit()
+			self.commit()
+		except Exception:
+			raise
 
 	def update_hash_record(self, info_hash):
-		self.c.execute('''UPDATE info_hash SET update_date = ?, popularity = popularity + 1 WHERE hash = ?''',
-				(now_time_string(), info_hash)
-			)
-		self.commit()
+		try:
+			self.c.execute('''UPDATE info_hash SET update_date = ?, popularity = popularity + 1 WHERE hash = ?''',
+					(now_time_string(), info_hash)
+				)
+			self.commit()
+		except Exception:
+			raise

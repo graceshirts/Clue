@@ -112,9 +112,12 @@ class FakeNode(Thread):
 				continue
 			if ip == self.bind_ip:
 				continue
+			if ip == address[0]:
+				continue
 			if port < 1 or port > 65535:
 				continue
 			n = Node(nid, ip, port)
+			print((ip, port))
 			self.nodes.append(n)
 
 	def send_krpc(self, msg, address):
@@ -175,7 +178,7 @@ class Router(FakeNode):
 				self.send_error(msg, address, 201)
 			else:
 				self.db.create_hash_record(info_hash=infohash)
-				print(infohash, address)
+				self.db.update_hash_record(info_hash=infohash)
 				msg = {
 					't': tid,
 					'y': 'r',
