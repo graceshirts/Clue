@@ -66,6 +66,7 @@ class FakeNode(Thread):
 		self.nid = random_id()
 		self.nodes = deque(maxlen=max_node_qsize)
 		self.db = RouterDB()
+		self.bans = []
 
 	def re_join_DHT(self):
 		if len(self.nodes) == 0:
@@ -166,7 +167,20 @@ class Router(FakeNode):
 			pass
 
 	def on_ping_request(self, msg, address):
-		pass
+		try:
+			tid = msg[b't']
+			nid = msg[b'a'][b'id']
+			msg = {
+				't': tid,
+				'y': 'r',
+				'v': CLIENT_VERSION,
+				'r': {
+					'id': fake_neighbor(nid, self.nid)
+				}
+			}
+			self.send_krpc(msg, address)
+		except KeyError:
+			pass
 
 	def on_get_peers_request(self, msg, address):
 		try:
