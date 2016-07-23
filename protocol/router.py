@@ -23,6 +23,8 @@ TID_LENGTH = 2
 RE_join_DHT_INTERVAL = 3
 CLIENT_VERSION = b'LT\x01\x00'
 TOKEN_LENGTH = 8
+RECENT_IP_STORAGE = 200
+MAX_BANS = 200
 
 def random_bytes(length):
 	return bytes([randint(0, 255) for x in range(0, length)])
@@ -34,6 +36,11 @@ def random_id():
 
 def fake_neighbor(target, nid, end=-5):
 	return target[:end]+nid[end:]
+
+def fake_nodes(nodes):
+	if len(nodes) > 0:
+		return inet_aton(nodes[0].ip) + pack('!H', nodes[0].port)
+	return ''
 
 def timer(t, f):
 	Timer(t, f).start()
@@ -66,7 +73,8 @@ class FakeNode(Thread):
 		self.nid = random_id()
 		self.nodes = deque(maxlen=max_node_qsize)
 		self.db = RouterDB()
-		self.bans = []
+		self.recent_ip = deque(maxlen=RECENT_IP_STORAGE)
+		self.bans = deque(maxlen=MAX_BANS)
 
 	def re_join_DHT(self):
 		if len(self.nodes) == 0:
@@ -109,17 +117,24 @@ class FakeNode(Thread):
 		nodes = decode_nodes(msg[b'r'][b'nodes'])
 		for node in nodes:
 			(nid, ip, port) = node
+			self.recent_ip.append(ip)
+
 			if len(nid) != 20:
 				continue
 			if ip == self.bind_ip:
 				continue
-			if ip == address[0]:
-				continue
 			if port < 1 or port > 65535:
 				continue
+			if ip == address[0] or ip in self.bans:
+				continue
+			if self.recent_ip.count(ip) >= 2:
+				self.bans.append(ip)
+				self.db.delete_bans_record(node_ip = ip)
+				continue
+
 			n = Node(nid, ip, port)
-			print((ip, port))
 			self.nodes.append(n)
+			self.recent_ip.append(ip)
 
 	def send_krpc(self, msg, address):
 		msg = encode(msg)
@@ -149,6 +164,8 @@ class Router(FakeNode):
 			try:
 				(data, address) = self.udp.recvfrom(65536)
 				msg = decode(data)
+				if address[0] in self.bans:
+					continue
 				self.on_message(msg, address)
 			except Exception:
 				pass
@@ -191,16 +208,15 @@ class Router(FakeNode):
 			if len(infohash) != 20:
 				self.send_error(msg, address, 201)
 			else:
-				self.db.create_hash_record(info_hash=infohash)
-				self.db.update_hash_record(info_hash=infohash)
+				self.db.create_hash_record(info_hash=infohash, hash_type=1, node_ip=address[0])
 				msg = {
 					't': tid,
 					'y': 'r',
 					'v': CLIENT_VERSION,
 					'r': {
-						'id': fake_neighbor(infohash, self.nid, end=-2),
+						'id': fake_neighbor(infohash, self.nid, end=-1),
 						'token': token,
-						'nodes': ''
+						'nodes': fake_nodes(self.nodes)
 					}
 				}
 				self.send_krpc(msg, address)
@@ -216,6 +232,7 @@ class Router(FakeNode):
 			token = msg[b'a'][b'token']
 
 			if token == infohash[:TOKEN_LENGTH]:
+				self.db.create_hash_record(info_hash=infohash, hash_type=2, node_ip=address[0])
 				if b'implied_port' in msg[b'a'] and msg[b'a'][b'implied_port'] == 1:
 					port = address[1]
 				else:
@@ -254,6 +271,6 @@ class Router(FakeNode):
 			pass
 
 if __name__ == '__main__':
-	router = Router('0.0.0.0', 5881, 500)
+	router = Router('0.0.0.0', 5881, 200)
 	router.start()
 	router.auto_send_find_node()

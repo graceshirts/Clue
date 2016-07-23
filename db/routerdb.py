@@ -14,6 +14,8 @@ class RouterDB(object):
 	def __init__(self):
 		self.conn = sqlite3.connect(FILE, check_same_thread=False)
 		self.c = self.conn.cursor()
+		self.c.execute('''VACUUM''')
+		self.commit()
 
 	def __del__(self):
 		self.conn.close()
@@ -21,23 +23,16 @@ class RouterDB(object):
 	def commit(self):
 		self.conn.commit()
 
-	def create_hash_record(self, info_hash):
-		try:
-			self.c.execute('''INSERT OR IGNORE INTO info_hash (hash, create_date, update_date) 
-					VALUES (?, ?, ?)''', 
-					(
-						b2a_hex(info_hash), now_time_string(), now_time_string()
-					)
+	def create_hash_record(self, hash_type, info_hash, node_ip):
+		self.c.execute('''INSERT OR REPLACE INTO info_hash (hash, hash_type, create_date, node_ip) 
+				VALUES (?, ?, ?, ?)''', 
+				(
+					b2a_hex(info_hash), hash_type, now_time_string(), node_ip
 				)
-			self.commit()
-		except Exception:
-			raise
+			)
+		self.commit()
 
-	def update_hash_record(self, info_hash):
-		try:
-			self.c.execute('''UPDATE info_hash SET update_date = ?, popularity = popularity + 1 WHERE hash = ?''',
-					(now_time_string(), info_hash)
-				)
-			self.commit()
-		except Exception:
-			raise
+	def delete_bans_record(self, node_ip):
+		deleted = self.c.execute('''DELETE FROM info_hash WHERE node_ip = ?''', node_ip)
+		print('delete malicious record.', deleted)
+		self.commit()
