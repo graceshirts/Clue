@@ -9,6 +9,7 @@ from socket import inet_aton, inet_ntoa
 from struct import pack, unpack
 
 from bencodepy import encode, decode
+from db.routerdb import RouterDB
 
 import pdb
 
@@ -33,11 +34,6 @@ def random_id():
 
 def fake_neighbor(target, nid, end=-5):
 	return target[:end]+nid[end:]
-
-def fake_nodes(nodes):
-	if len(nodes) > 0:
-		return inet_aton(nodes[0].ip)+struct.pack('!H', nodes[0].port)
-	return ''
 
 def timer(t, f):
 	Timer(t, f).start()
@@ -69,6 +65,7 @@ class FakeNode(Thread):
 		super().__init__()
 		self.nid = random_id()
 		self.nodes = deque(maxlen=max_node_qsize)
+		self.db = RouterDB()
 
 	def re_join_DHT(self):
 		if len(self.nodes) == 0:
@@ -153,30 +150,20 @@ class Router(FakeNode):
 				pass
 
 	def on_message(self, msg, address):
-		if msg[b'y'] == b'r':
-			if b'nodes' in msg[b'r']:
-				self.process_find_node_response(msg, address)
-		elif msg[b'y'] == b'q':
-			try:
-				self.process_request_actions[msg[b'q']](msg, address)
-			except KeyError:
-				self.send_error(msg, address)
+		try:
+			if msg[b'y'] == b'r':
+				if b'nodes' in msg[b'r']:
+					self.process_find_node_response(msg, address)
+			elif msg[b'y'] == b'q':
+				try:
+					self.process_request_actions[msg[b'q']](msg, address)
+				except KeyError:
+					self.send_error(msg, address)
+		except:
+			pass
 
 	def on_ping_request(self, msg, address):
-		try:
-			tid = msg[b't']
-			nid = msg[b'a'][b'id']
-			msg = {
-				't': tid,
-				'y': 'r',
-				'v': CLIENT_VERSION,
-				'r': {
-					'id': fake_neighbor(nid, self.nid)
-				}
-			}
-			self.send_krpc(msg, address)
-		except KeyError:
-			pass
+		pass
 
 	def on_get_peers_request(self, msg, address):
 		try:
@@ -187,12 +174,14 @@ class Router(FakeNode):
 			if len(infohash) != 20:
 				self.send_error(msg, address, 201)
 			else:
+				self.db.create_hash_record(info_hash=infohash)
+				print(infohash, address)
 				msg = {
 					't': tid,
 					'y': 'r',
 					'v': CLIENT_VERSION,
 					'r': {
-						'id': fake_neighbor(infohash, self.nid),
+						'id': fake_neighbor(infohash, self.nid, end=-2),
 						'token': token,
 						'nodes': ''
 					}
@@ -202,7 +191,7 @@ class Router(FakeNode):
 			pass
 
 	def on_announce_peer_request(self, msg, address):
-		self.set_trace()
+		
 		try:
 			tid = msg[b't']
 			nid = msg[b'a'][b'id']
